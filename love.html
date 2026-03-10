@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Mwe Sein - Vertical Interactive Book</title>
+    <style>
+        /* 基础设置 */
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: "Segoe UI", "Tahoma", "Geneva", Verdana, sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
+        canvas { display: block; position: absolute; top: 0; left: 0; }
+        #fwCanvas { z-index: 50; pointer-events: none; }
+        #particleCanvas { z-index: 100; pointer-events: none; }
+
+        #book-container {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 650px; height: 580px; perspective: 3000px;
+            display: none; opacity: 0; z-index: 200;
+            transition: opacity 0.8s ease-in-out;
+            touch-action: none;
+        }
+
+        .book { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+        
+        /* 螺旋环 */
+        .spiral {
+            position: absolute; top: -15px; left: 20px; width: calc(100% - 40px); height: 30px;
+            display: flex; flex-direction: row; justify-content: space-around;
+            z-index: 10; pointer-events: none; transform-style: preserve-3d;
+        }
+        .ring {
+            width: 10px; height: 35px; background: linear-gradient(to right, #444, #888, #444);
+            border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 页面基础 */
+        .page {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+            transform-origin: top; transform-style: preserve-3d;
+            transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: grab;
+            will-change: transform;
+        }
+        .page:active { cursor: grabbing; }
+        
+        .side {
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+            border-radius: 5px 5px 15px 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+
+        /* 封面样式 - 强化文字 */
+        .cover {
+            background-color: #b3956e;
+            background-image: 
+                linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0) 5%, rgba(0,0,0,0) 95%, rgba(0,0,0,0.1) 100%),
+                radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px);
+            background-size: 100% 100%, 4px 4px;
+            border-top: 15px solid rgba(0,0,0,0.15);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+        }
+        
+        .cover-title { text-align: center; color: #2a1f12; pointer-events: none; }
+        .cover-title h1 { 
+            font-size: 64px; /* 加大 */
+            margin: 0; 
+            font-family: "Georgia", serif; 
+            font-weight: bold;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.3), -1px -1px 0px rgba(0,0,0,0.5); /* 雕刻感 */
+        }
+        .cover-title p {
+            letter-spacing: 8px; 
+            font-size: 18px; 
+            margin-top: 10px; 
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        /* 内页样式 */
+        .page-inner { 
+            background-color: #fffef0; 
+            background-image: 
+                linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.02) 5%, transparent 15%),
+                url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAMAAAAp4XiDAAAAUVBMVEWFhYWDg4N3dXWtpaW1tbW9vb3Nzc3V1dXb29vjy8vT09Pd3d3f39/m5ubp6enr6+vt7e3u7u7x8fHy8vLz8/P09PT19fX29vb39/f5+fn6+vn7+/sJaN43AAAAtklEQVQ4y2P4z8AEAtY8NmwAmBwGAwS+GjYAxH6+bXWwYw93Xv4M8f9g488Xf9j688Uftf588UetP5/pYPsH5vO5pL5HOfW58fFvI9E9KqlP5mR97uO68fEfsP58pIPtH6S+uST5fG4u9bn48bE56R8b65v+6bO+9U859HFsOveY8fFvqBfP5yE7/M9I/wY05PAnK/0b0pDAn9SmeS87SOf8D5YpADi7X6QvX8X68vWp/5H1eX5Cfv8K9YVwAAwAZlGfS9U7r/oAAAAASUVORK5CYII=');
+        }
+
+        .page-inner img { 
+            width: 88%; height: 88%; object-fit: contain; 
+            border: 10px solid white; box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+            pointer-events: none;
+        }
+        
+        .back { transform: rotateX(-180deg); }
+        .book.flipped-active .ring { transform: rotateX(-160deg); }
+
+        /* 底部提示语 - 极大增强显眼度 */
+        #click-hint {
+            position: absolute; bottom: -140px; width: 100vw; left: 50%; transform: translateX(-50%);
+            text-align: center; 
+            color: #ffffff; 
+            font-size: 34px; /* 加大 */
+            font-weight: 900;
+            letter-spacing: 2px;
+            /* 核心：增强发光阴影，确保黑背景下极其醒目 */
+            text-shadow: 
+                0 0 10px rgba(66, 200, 245, 0.8),
+                0 0 20px rgba(66, 200, 245, 0.5),
+                0 0 30px rgba(255, 255, 255, 0.4);
+            animation: breathe 1.5s infinite; 
+            pointer-events: none;
+        }
+
+        /* 结尾祝福语 */
+        .final-wish h2 { 
+            font-size: 48px; 
+            color: #2a1f12; 
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .final-wish p { font-size: 22px; color: #4a3b2a; font-weight: bold; }
+
+        @keyframes breathe { 
+            0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(0.95); } 
+            50% { opacity: 1; transform: translateX(-50%) scale(1.05); } 
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="fwCanvas"></canvas>
+<canvas id="particleCanvas"></canvas>
+
+<div id="book-container">
+    <div class="spiral">
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    </div>
+
+    <div class="book" id="main-book">
+        <div class="page" id="p1" style="z-index: 5;">
+            <div class="side cover">
+                <div class="cover-title">
+                    <h1>Mwe Sein</h1>
+                    <p>NOTEBOOK</p>
+                </div>
+            </div>
+            <div class="side back page-inner"><img src="mwe1.jpg" alt="Photo 1"></div>
+        </div>
+
+        <div class="page" id="p2" style="z-index: 4;">
+            <div class="side page-inner"><img src="mwe2.jpg" alt="Photo 2"></div>
+            <div class="side back page-inner"><img src="mwe3.jpg" alt="Photo 3"></div>
+        </div>
+
+        <div class="page" id="p3" style="z-index: 3;">
+            <div class="side page-inner"><img src="mwe4.jpg" alt="Photo 4"></div>
+            <div class="side back page-inner"><img src="mwe5.jpg" alt="Photo 5"></div>
+        </div>
+
+        <div class="page" id="p4" style="z-index: 2;">
+            <div class="side page-inner"><img src="mwe6.jpg" alt="Photo 6"></div>
+            <div class="side back cover" style="border: none;">
+                <div class="final-wish" style="text-align:center; padding: 20px;">
+                    <h2>Happy Birthday</h2>
+                    <p>Wishing you a<br>wonderful day!</p>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    <div id="click-hint">✦ စာအုပ်ကိုအောက်မှအပေါ်သို့ဆွဲဖွင့်ရန် ✦</div>
+</div>
+
+<script>
+// --- JS 部分保持原有逻辑，仅修正可能影响文字显示的逻辑 ---
+const fwCanvas = document.getElementById('fwCanvas');
+const fwCtx = fwCanvas.getContext('2d');
+const pCanvas = document.getElementById('particleCanvas');
+const pCtx = pCanvas.getContext('2d');
+let fwW, fwH, fireworks = [];
+let particles = [], countdownNum = 3, hideParticles = false;
+const BLUE_COLOR = "#42c8f5"; 
+
+function resize() { 
+    fwW = fwCanvas.width = pCanvas.width = window.innerWidth; 
+    fwH = fwCanvas.height = pCanvas.height = window.innerHeight; 
+}
+window.addEventListener('resize', resize);
+
+class FireworkParticle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y; this.color = color;
+        this.velocity = { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8 };
+        this.alpha = 1; this.decay = Math.random() * 0.015 + 0.015;
+    }
+    draw() {
+        fwCtx.save(); fwCtx.globalAlpha = this.alpha; fwCtx.beginPath();
+        fwCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2); fwCtx.fillStyle = this.color; fwCtx.fill(); fwCtx.restore();
+    }
+    update() { this.x += this.velocity.x; this.y += this.velocity.y; this.velocity.y += 0.05; this.alpha -= this.decay; }
+}
+
+function launchFirework() {
+    const x = Math.random() * fwW, y = Math.random() * (fwH * 0.6);
+    const color = `hsl(${Math.random() * 360}, 100%, 65%)`;
+    for (let i = 0; i < 50; i++) fireworks.push(new FireworkParticle(x, y, color));
+}
+
+function animateFW() {
+    requestAnimationFrame(animateFW);
+    fwCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    fwCtx.fillRect(0, 0, fwW, fwH);
+    fireworks.forEach((p, i) => { p.update(); p.draw(); if (p.alpha <= 0) fireworks.splice(i, 1); });
+}
+
+function getPoints(text) {
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = fwW; tempCanvas.height = fwH;
+    let fs = text.length > 15 ? Math.min(fwW/12, 60) : Math.min(fwW/5, 200);
+    tempCtx.font = `bold ${fs}px sans-serif`;
+    tempCtx.textAlign = "center"; tempCtx.textBaseline = "middle";
+    tempCtx.fillText(text, fwW/2, fwH/2);
+    const data = tempCtx.getImageData(0, 0, fwW, fwH).data;
+    const pts = [];
+    for (let y = 0; y < fwH; y += 7) {
+        for (let x = 0; x < fwW; x += 7) {
+            if (data[(y * fwW + x) * 4 + 3] > 128) pts.push({x, y});
+        }
+    }
+    return pts;
+}
+
+function updateTargets(pts) {
+    particles.forEach((p, i) => {
+        const t = pts[i % pts.length];
+        if(t) { p.tx = t.x; p.ty = t.y; }
+    });
+}
+
+function runFlow() {
+    if (countdownNum >= 1) {
+        updateTargets(getPoints(countdownNum.toString()));
+        countdownNum--; 
+        setTimeout(runFlow, 800);
+    } else {
+        updateTargets(getPoints("Happy Birthday to You"));
+        const fwLaunch = setInterval(launchFirework, 120); 
+        setTimeout(() => {
+            clearInterval(fwLaunch);
+            updateTargets(getPoints("Mwe Sein"));
+            setTimeout(() => {
+                particles.forEach(p => p.ty = -fwH);
+                setTimeout(() => { 
+                    hideParticles = true; 
+                    const container = document.getElementById('book-container');
+                    container.style.display = 'block'; 
+                    setTimeout(() => container.style.opacity = '1', 50); 
+                    initBookEvents(); 
+                }, 600);
+            }, 1800);
+        }, 2500);
+    }
+}
+
+function initBookEvents() {
+    const pages = document.querySelectorAll('.page');
+    let isDragging = false, startY = 0, currentTargetPage = null;
+
+    pages.forEach(page => {
+        const originalZ = parseInt(window.getComputedStyle(page).zIndex); 
+        page.querySelectorAll('img').forEach(img => { img.ondragstart = () => false; });
+
+        const startHandler = (e) => {
+            isDragging = true; 
+            currentTargetPage = page;
+            startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            page.style.transition = 'none'; 
+        };
+
+        const moveHandler = (e) => {
+            if (!isDragging || currentTargetPage !== page) return;
+            if (e.cancelable) e.preventDefault();
+            const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            const diff = currentY - startY;
+            if (!page.classList.contains('flipped')) {
+                if (diff < 0) {
+                    let angle = Math.max(-165, diff * 0.6);
+                    page.style.transform = `rotateX(${-angle}deg)`;
+                    page.style.zIndex = (angle < -90) ? "0" : originalZ;
+                }
+            } else {
+                if (diff > 0) {
+                    let angle = Math.min(0, -165 + diff * 0.6);
+                    page.style.transform = `rotateX(${-angle}deg)`;
+                    page.style.zIndex = (angle > -90) ? originalZ : "0";
+                }
+            }
+        };
+
+        const endHandler = (e) => {
+            if (!isDragging || currentTargetPage !== page) return;
+            isDragging = false;
+            const endY = e.type.includes('touch') ? (e.changedTouches ? e.changedTouches[0].clientY : startY) : e.clientY;
+            const diff = endY - startY;
+            page.style.transition = 'transform 0.8s cubic-bezier(0.2, 0, 0.2, 1)';
+            const threshold = 60; 
+            if (!page.classList.contains('flipped')) {
+                if (diff < -threshold) { flipPage(page, originalZ, true); } 
+                else { resetPage(page, originalZ); }
+            } else {
+                if (diff > threshold) { flipPage(page, originalZ, false); } 
+                else { resetPage(page, originalZ); }
+            }
+            if (Math.abs(diff) < 10) {
+                const currentlyFlipped = page.classList.contains('flipped');
+                flipPage(page, originalZ, !currentlyFlipped);
+            }
+            currentTargetPage = null;
+        };
+
+        page.addEventListener('mousedown', startHandler);
+        page.addEventListener('touchstart', startHandler, {passive: false});
+        window.addEventListener('mousemove', moveHandler);
+        window.addEventListener('touchmove', moveHandler, {passive: false});
+        window.addEventListener('mouseup', endHandler);
+        window.addEventListener('touchend', endHandler);
+    });
+}
+
+function resetPage(el, originalZ) { 
+    const isFlipped = el.classList.contains('flipped');
+    el.style.transform = isFlipped ? 'rotateX(165deg)' : 'rotateX(0deg)'; 
+    el.style.zIndex = isFlipped ? "0" : originalZ;
+}
+
+function flipPage(el, originalZ, shouldFlip) {
+    const book = document.getElementById('main-book');
+    const hint = document.getElementById('click-hint');
+    if(hint) hint.style.display = 'none';
+    if (shouldFlip) {
+        el.classList.add('flipped');
+        el.style.transform = 'rotateX(165deg)';
+        if(el.id === 'p1') book.classList.add('flipped-active');
+        setTimeout(() => { if(el.classList.contains('flipped')) el.style.zIndex = "0"; }, 400);
+    } else {
+        el.style.zIndex = originalZ; 
+        if(el.id === 'p1') book.classList.remove('flipped-active');
+        el.classList.remove('flipped');
+        el.style.transform = 'rotateX(0deg)';
+    }
+}
+
+function initParticles() {
+    for (let i = 0; i < 2000; i++) {
+        particles.push({ x: Math.random()*fwW, y: Math.random()*fwH, tx: fwW/2, ty: fwH/2, size: Math.random()*2 + 1 });
+    }
+    runFlow();
+}
+
+function animateParticles() {
+    if (!hideParticles) {
+        pCtx.clearRect(0, 0, fwW, fwH);
+        particles.forEach(p => {
+            p.x += (p.tx - p.x) * 0.09; p.y += (p.ty - p.y) * 0.09;
+            pCtx.fillStyle = BLUE_COLOR; pCtx.beginPath(); pCtx.arc(p.x, p.y, p.size, 0, Math.PI*2); pCtx.fill();
+        });
+    }
+    requestAnimationFrame(animateParticles);
+}
+
+resize(); initParticles(); animateFW(); animateParticles();
+</script>
+</body>
+</html>

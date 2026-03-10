@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开启惊喜</title>
+    <style>
+        :root {
+            --box-color: #ff4d4d;
+            --lid-color: #ff5e5e;
+            --ribbon-color: #ffd700;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #2c3e50 0%, #000 100%);
+            overflow: hidden;
+            font-family: 'PingFang SC', sans-serif;
+        }
+
+        /* 礼物盒整体 - 增加呼吸动效 */
+        .gift-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            cursor: pointer;
+            perspective: 1000px;
+            animation: breathe 3s ease-in-out infinite; /* 持续呼吸感 */
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 盒身 - 增加渐变层次 */
+        .box-body {
+            position: absolute;
+            bottom: 0;
+            width: 200px;
+            height: 160px;
+            background: linear-gradient(135deg, var(--box-color), #d43f3f);
+            border-radius: 0 0 10px 10px;
+            box-shadow: inset 0 -10px 20px rgba(0,0,0,0.2), 0 20px 40px rgba(0,0,0,0.5);
+            z-index: 1;
+        }
+
+        /* 盒盖 - 增加更复杂的旋转轨迹 */
+        .box-lid {
+            position: absolute;
+            top: 10px;
+            left: -10px;
+            width: 220px;
+            height: 50px;
+            background-color: var(--lid-color);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 5;
+            transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* 弹性贝塞尔曲线 */
+            transform-origin: bottom right;
+        }
+
+        /* 丝带 - 增加质感 */
+        .ribbon-body {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 100%;
+            background: linear-gradient(to right, #f1c40f, var(--ribbon-color), #f1c40f);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+
+        /* 蝴蝶结 - 悬停时摇晃 */
+        .bow {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 40px;
+            z-index: 6;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .bow::before, .bow::after {
+            content: '';
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border: 10px solid var(--ribbon-color);
+            border-radius: 50%;
+            box-sizing: border-box;
+        }
+        .bow::before { left: 0; transform: rotate(-15deg); }
+        .bow::after { right: 0; transform: rotate(15deg); }
+
+        /* --- 动态交互状态 --- */
+
+        /* 悬停时：盖子向上跳动且倾斜 */
+        .gift-container:hover .box-lid {
+            transform: translateY(-15px) rotate(-2deg);
+        }
+        .gift-container:hover .bow {
+            transform: translateX(-50%) translateY(-10px) scale(1.1);
+        }
+
+        /* 点击后：极致的弹飞效果 */
+        .gift-container.open {
+            animation: none; /* 停止呼吸 */
+        }
+        .gift-container.open .box-lid {
+            transform: translate(150px, -300px) rotate(120deg) scale(0.5);
+            opacity: 0;
+        }
+        
+        .gift-container.open .bow {
+            transform: translate(150px, -350px) scale(0);
+            opacity: 0;
+        }
+
+        /* 内部金光喷发 */
+        .inner-light {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            box-shadow: 0 0 50px 30px white, 0 0 100px 60px var(--ribbon-color);
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 0;
+        }
+
+        .gift-container.open .inner-light {
+            animation: explosion 0.8s ease-out forwards;
+        }
+
+        @keyframes explosion {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(30); }
+        }
+
+        h1 {
+            color: white;
+            margin-top: 50px;
+            letter-spacing: 5px;
+            font-weight: 300;
+            transition: opacity 0.5s;
+            text-shadow: 0 0 15px rgba(255,215,0,0.5);
+        }
+
+        .gift-container.open + h1 {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="gift-container" id="gift" onclick="handleOpen()">
+        <div class="inner-light"></div>
+        <div class="bow"></div>
+        <div class="box-lid">
+            <div class="ribbon-body" style="width: 40px; left: 50%;"></div>
+        </div>
+        <div class="box-body">
+            <div class="ribbon-body"></div>
+        </div>
+    </div>
+
+    <h1 id="title">点开礼物 </h1>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        function handleOpen() {
+            const gift = document.getElementById('gift');
+            if (gift.classList.contains('open')) return;
+
+            // 1. 触发CSS动画
+            gift.classList.add('open');
+
+            // 2. 更加灵活的粒子喷洒 (分两次喷洒增加层次感)
+            const duration = 1500;
+            const animationEnd = Date.now() + duration;
+            const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            const interval = setInterval(function() {
+                const timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                const particleCount = 50 * (timeLeft / duration);
+                // 模拟从箱子里喷出的效果
+                confetti(Object.assign({}, defaults, { 
+                    particleCount, 
+                    origin: { x: randomInRange(0.4, 0.6), y: randomInRange(0.4, 0.6) },
+                    colors: ['#ff4d4d', '#ffd700', '#ffffff', '#ff85a1'],
+                    scalar: randomInRange(0.8, 1.2)
+                }));
+            }, 250);
+
+            // 3. 延迟跳转
+            setTimeout(() => {
+                // 增加淡出效果
+                document.body.style.transition = "opacity 0.8s";
+                document.body.style.opacity = "0";
+                setTimeout(() => {
+                    window.location.href = "love.html"; 
+                }, 800);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
